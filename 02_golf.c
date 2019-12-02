@@ -1,0 +1,1 @@
+a[999],b[999],n,x,y,p,q,i,t,k;main(){while(scanf("%d,",&x)==1)b[n++]=x;for(x=99;x;x--)for(y=99;y;y--){for(i=n;--i;)a[i]=b[i];a[1]=x,a[2]=y;for(i=0;a[i]!=99;i+=4)t=a[a[i+1]],k=a[a[i+2]],a[a[i+3]]=a[i]-1?k*t:k+t;if(x==12&&y==2)p=*a;if(*a==19690720)q=100*x+y;}printf("%d\n%d\n",p,q);}
