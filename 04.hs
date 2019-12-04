@@ -1,5 +1,5 @@
 import Data.List
+r = [357253 .. 892942]
 f t s = any t (map length (group s)) && sort s == s
-g r = (h (>= 2), h (== 2)) where h t = length $ filter (f t . show) r
-p s | (x, (_ : y)) <- break (== '-') s = [read x :: Int .. read y]
-main = interact $ show . g . p
+h t = length $ filter (f t . show) r
+main = print (h (>= 2), h (== 2))
