@@ -3,22 +3,18 @@
 #include <stdlib.h>
 
 long run(long *a, long input) {
-	static void *op_table[] = { [1] = &&ADD, [2] = &&MUL, [3] = &&OUTPUT,
-		[4] = &&INPUT, [5] = &&JT, [6] = &&JF, [7] = &&LT, [8] = &&EQ,
-		[99] = &&END };
-	int pc = 0;
-	long ins, in1, in2;
-	long output = 0;
-#define OP (ins%100)
-#define IN1 in1 = ins/  100%10 ? a[pc++] : a[a[pc++]]
-#define IN2 in2 = ins/ 1000%10 ? a[pc++] : a[a[pc++]]
+	static void *op_table[] = { [1] = &&ADD, [2] = &&MUL, [3] = &&R, [4] = &&W,
+		[5] = &&JT, [6] = &&JF, [7] = &&LT, [8] = &&EQ, [99] = &&END };
+	long pc = 0, ins, in1, in2, output = 0;
+#define IN1 in1 = ins/100%10 ? a[pc++] : a[a[pc++]]
+#define IN2 in2 = ins/1000%10 ? a[pc++] : a[a[pc++]]
 #define OUT(v) a[a[pc++]] = v
-#define NEXT ins = a[pc++]; goto *op_table[OP];
+#define NEXT ins = a[pc++]; goto *op_table[ins%100]
 	NEXT;
 ADD: IN1; IN2; OUT(in1 + in2); NEXT;
 MUL: IN1; IN2; OUT(in1 * in2); NEXT;
-OUTPUT: OUT(input); NEXT;
-INPUT: IN1; output = in1; NEXT;
+R: OUT(input); NEXT;
+W: IN1; output = in1; NEXT;
 JT: IN1; IN2; if (in1) pc = in2; NEXT;
 JF: IN1; IN2; if (!in1) pc = in2; NEXT;
 LT: IN1; IN2; OUT(in1 < in2); NEXT;
