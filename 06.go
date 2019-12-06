@@ -2,16 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"strings"
 )
 
-type none = struct{}
-
 func search(g map[string][]string, start, end string) int {
 	d := -1
-	s := map[string]none{}
+	s := map[string]struct{}{}
 	q := []string{start}
 	for len(q) != 0 {
 		nq := []string{}
@@ -23,7 +19,7 @@ func search(g map[string][]string, start, end string) int {
 				if _, ok := s[c]; !ok {
 					nq = append(nq, c)
 				}
-				s[c] = none{}
+				s[c] = struct{}{}
 			}
 		}
 		q = nq
@@ -37,22 +33,18 @@ func main() {
 	g := map[string][]string{}
 	u := map[string][]string{}
 	for {
-		n, err := fmt.Scanf("%s", &s)
-		if err != nil && err != io.EOF {
-			log.Fatal(err)
-		}
+		n, _ := fmt.Scanf("%s", &s)
 		if n != 1 {
 			break
 		}
 		v := strings.Split(s, ")")
 		a, b := v[0], v[1]
 		g[b] = append(g[b], a)
-		g[a] = append([]string{}, g[a]...)
 		u[a] = append(u[a], b)
 		u[b] = append(u[b], a)
 	}
 	t := 0
-	for k := range g {
+	for k := range u {
 		t += search(g, k, "")
 	}
 	fmt.Println(t)
