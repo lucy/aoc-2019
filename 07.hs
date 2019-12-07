@@ -1,60 +1,35 @@
-{-# LANGUAGE FlexibleContexts, BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
+import Control.Monad
 import Control.Monad.ST
-import Data.Array.ST
 import Data.Array
+import Data.Array.ST
 import Data.List
+if' :: Bool -> a -> a -> a
+if' t x y = if t then x else y
 vm :: STArray s Int Int -> [Int] -> Int -> ST s [Int]
 vm m input pc = do
   is <- readArray m pc
   let
     op = is `mod` 100
-    m1 = ((is `quot` 100) `mod` 10)
-    m2 = ((is `quot` 1000) `mod` 10)
+    i1 = i 1 ((is `quot` 100) `mod` 10)
+    i2 = i 2 ((is `quot` 1000) `mod` 10)
     i i 1 = readArray m (pc + i)
     i i 0 = readArray m (pc + i) >>= readArray m
     o i x = readArray m (pc + i) >>= \i' -> writeArray m i' x
+    op2 f = liftM2 f i1 i2
   case op of
-    1 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      o 3 (i1 + i2)
-      vm m input (pc + 4)
-    2 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      o 3 (i1 * i2)
-      vm m input (pc + 4)
-    3 -> do
-      o 1 (head input)
-      vm m (tail input) (pc + 2)
-    4 -> do
-      i1     <- i 1 m1
-      output <- vm m input (pc + 2)
-      return (i1 : output)
-    5 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      vm m input (if i1 /= 0 then i2 else pc + 3)
-    6 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      vm m input (if i1 == 0 then i2 else pc + 3)
-    7 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      o 3 (if i1 < i2 then 1 else 0)
-      vm m input (pc + 4)
-    8 -> do
-      i1 <- i 1 m1
-      i2 <- i 2 m2
-      o 3 (if i1 == i2 then 1 else 0)
-      vm m input (pc + 4)
+    1  -> op2 (+) >>= o 3 >> vm m input (pc + 4)
+    2  -> op2 (*) >>= o 3 >> vm m input (pc + 4)
+    3  -> o 1 (head input) >> vm m (tail input) (pc + 2)
+    4  -> liftM2 (:) i1 $ vm m input (pc + 2)
+    5  -> op2 (\i1 i2 -> if' (i1 /= 0) i2 (pc + 3)) >>= vm m input
+    6  -> op2 (\i1 i2 -> if' (i1 == 0) i2 (pc + 3)) >>= vm m input
+    7  -> op2 (\i1 i2 -> if' (i1 >= i2) 0 1) >>= o 3 >> vm m input (pc + 4)
+    8  -> op2 (\i1 i2 -> if' (i1 == i2) 1 0) >>= o 3 >> vm m input (pc + 4)
     99 -> return []
-    _  -> error $ "invalid opcode: " ++ show is ++ " " ++ show pc
+    _  -> error $ "invalid opcode: " ++ show is ++ " at " ++ show pc
 vm' :: Array Int Int -> [Int] -> [Int]
-vm' a input = runST do
-  m <- thaw a :: ST s (STArray s Int Int)
-  vm m input 0
+vm' a input = runST $ thaw a >>= \m -> vm m input 0
 amp :: Array Int Int -> [Int] -> Int
 amp m (x : xs) = last e
  where
