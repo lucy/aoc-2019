@@ -83,56 +83,49 @@ func perm(a []int64, f func([]int64), i int) {
 }
 
 func p1(m []int64, p []int64) int64 {
-	i := int64(0)
+	w := make(chan int64)
+	a := w
 	for _, x := range p {
 		b := make([]int64, len(m))
 		copy(b, m)
-		r, w := make(chan int64), make(chan int64)
-		go func() { run(b, r, w); close(w) }()
+		r := w
+		w = make(chan int64)
+		go func() { run(b, r, w) }()
 		r <- x
-		r <- i
-		i = <-w
-		select {
-		case v, ok := <-w:
-			if ok {
-				panic(fmt.Sprint("unexpected value: %d", v))
-			}
-		}
 	}
-	return i
+	a <- 0
+	return <-w
 }
 
 func p2(m []int64, p []int64) int64 {
-	r, w := make(chan int64), make(chan int64)
-	fst := r
-	last := int64(0)
+	w := make(chan int64)
+	a := w
 	wg := sync.WaitGroup{}
 	wg.Add(len(p))
 	for i, x := range p {
 		b := make([]int64, len(m))
-		end := make(chan struct{})
 		copy(b, m)
+		r := w
+		w = make(chan int64)
 		if i == len(p)-1 {
-			go func(w chan int64, end chan struct{}) {
+			// pipe last to first
+			defer close(w)
+			go func() {
 				for {
-					select {
-					case x := <-w:
-						last = x
-						fst <- x
-					case <-end:
+					v, ok := <-w
+					if !ok {
 						return
 					}
+					a <- v
 				}
-			}(w, end)
+			}()
 		}
-		go func() { run(b, r, w); close(end); wg.Done() }()
+		go func() { run(b, r, w); wg.Done() }()
 		r <- x
-		r = w
-		w = make(chan int64)
 	}
-	fst <- 0
+	a <- 0
 	wg.Wait()
-	return last
+	return <-a
 }
 
 func w(m []int64, p []int64, f func([]int64, []int64) int64) {
@@ -162,5 +155,6 @@ func main() {
 		a = append(a, x)
 	}
 	w(a, []int64{0, 1, 2, 3, 4}, p1)
+	w(a, []int64{0, 1, 2, 3, 4}, p2) // works too
 	w(a, []int64{5, 6, 7, 8, 9}, p2)
 }
