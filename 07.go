@@ -90,7 +90,7 @@ func p1(m []int64, p []int64) int64 {
 		copy(b, m)
 		r := w
 		w = make(chan int64)
-		go func() { run(b, r, w) }()
+		go run(b, r, w)
 		r <- x
 	}
 	a <- 0
@@ -102,27 +102,24 @@ func p2(m []int64, p []int64) int64 {
 	a := w
 	wg := sync.WaitGroup{}
 	wg.Add(len(p))
-	for i, x := range p {
+	for _, x := range p {
 		b := make([]int64, len(m))
 		copy(b, m)
 		r := w
 		w = make(chan int64)
-		if i == len(p)-1 {
-			// pipe last to first
-			defer close(w)
-			go func() {
-				for {
-					v, ok := <-w
-					if !ok {
-						return
-					}
-					a <- v
-				}
-			}()
-		}
 		go func() { run(b, r, w); wg.Done() }()
 		r <- x
 	}
+	defer close(w) // kill pipe after return
+	go func() {    // pipe last to first
+		for {
+			v, ok := <-w
+			if !ok {
+				return
+			}
+			a <- v
+		}
+	}()
 	a <- 0
 	wg.Wait()
 	return <-a
