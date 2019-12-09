@@ -1,8 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-import Control.Monad.ST
-import Data.Array
-import Data.Array.ST
-import Data.List
 import qualified Data.Map.Strict as M
 import Data.Int
 type Mem = M.Map Int64 Int64
@@ -31,7 +27,6 @@ vm m ch =
         8 -> go (w p3 $ if r p1 == r p2 then 1 else 0) ch rb (pc + 4)
         9 -> go m ch (rb + r p1) (pc + 2)
         99 -> []
-        _ -> error ("invalid ins: " ++ show is ++ " at " ++ show pc)
   in go m ch 0 0
 parse :: String -> Mem
 parse s = let l = read ("[" ++ s ++ "]") in M.fromList (zip [0 ..] l)
