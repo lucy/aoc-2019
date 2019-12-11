@@ -1,6 +1,11 @@
 CFLAGS += -O2 -Wall -Wextra -g
 CPPFLAGS += -D_GNU_SOURCE
-bin = $(patsubst %.c,%,$(wildcard *.c))
-all: $(bin)
-clean:; rm -f $(bin) *.o *.hi
+cbin = $(patsubst %.c,%c,$(wildcard *.c))
+hsbin = $(patsubst %.hs,%hs,$(wildcard *.hs))
+gobin = $(patsubst %.go,%go,$(wildcard *.go))
+all: $(cbin) $(hsbin) $(gobin)
+%c: %.c; $(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
+%hs: %.hs; ghc -v0 -O $^ -o $@
+%go: %.go; go build -o $@ $^
+clean:; rm -f $(cbin) $(hsbin) $(gobin) *.o *.hi
 .PHONY: clean

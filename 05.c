@@ -2,28 +2,32 @@
 #include <string.h>
 #include <stdlib.h>
 
-struct vm { long *m; long pc; long ins; };
-struct call { long v; char t; };
+struct vm {
+	long *m;
+	long pc, ins;
+	long state, ch;
+};
 
-#define VM_START  0
-#define VM_END    1
-#define VM_INPUT  2
-#define VM_OUTPUT 3
+#define VM_START 0
+#define VM_END   1
+#define VM_RECV  2
+#define VM_SEND  3
 
-void run(struct vm *vm, struct call *call) {
-	static void *op_table[] = { [1] = &&ADD, [2] = &&MUL, [3] = &&I, [4] = &&O,
-		[5] = &&JT, [6] = &&JF, [7] = &&LT, [8] = &&EQ, [99] = &&END };
+void run(struct vm *vm) {
+	static void *op_table[] = { [1] = &&ADD, [2] = &&MUL, [3] = &&RECV,
+		[4] = &&SEND, [5] = &&JT, [6] = &&JF, [7] = &&LT, [8] = &&EQ,
+		[99] = &&END };
 	long pc = vm->pc, *m = vm->m, ins = vm->ins, in1, in2;
 #define IN1 in1 = ins/100%10 ? m[pc++] : m[m[pc++]]
 #define IN2 in2 = ins/1000%10 ? m[pc++] : m[m[pc++]]
 #define OUT(v) m[m[pc++]] = v
 #define NEXT ins = m[pc++]; goto *op_table[ins%100]
-#define CALL vm->pc = pc; vm->ins = ins; return
-	switch (call->t) {
+#define RET(st) vm->pc = pc; vm->ins = ins; vm->state = st; return
+	switch (vm->state) {
 	case VM_START: NEXT;
 	case VM_END: goto END;
-	case VM_INPUT: OUT(call->v); NEXT;
-	case VM_OUTPUT: NEXT;
+	case VM_RECV: OUT(vm->ch); NEXT;
+	case VM_SEND: NEXT;
 	}
 ADD: IN1; IN2; OUT(in1 + in2); NEXT;
 MUL: IN1; IN2; OUT(in1 * in2); NEXT;
@@ -31,24 +35,46 @@ JT: IN1; IN2; if (in1) pc = in2; NEXT;
 JF: IN1; IN2; if (!in1) pc = in2; NEXT;
 LT: IN1; IN2; OUT(in1 < in2); NEXT;
 EQ: IN1; IN2; OUT(in1 == in2); NEXT;
-I: call->t = VM_INPUT; CALL;
-O: IN1; call->t = VM_OUTPUT; call->v = in1; CALL;
-END: call->t = VM_END; CALL;
+RECV: RET(VM_RECV);
+SEND: IN1; vm->ch = in1; RET(VM_SEND);
+END: RET(VM_END);
 }
 
 long run_with_input(long *m, long input) {
 	long output = 0;
-	struct vm vm = (struct vm) { .m = m, .pc = 0 };
-	struct call call = {0};
+	struct vm vm = (struct vm) { .m = m, .pc = 0, .state = VM_START };
 	for (;;) {
-		run(&vm, &call);
-		switch (call.t) {
+		run(&vm);
+		switch (vm.state) {
 		case VM_END: return output;
-		case VM_INPUT: call.v = input; continue;
-		case VM_OUTPUT: output = call.v; continue;
+		case VM_RECV: vm.ch = input; continue;
+		case VM_SEND: output = vm.ch; continue;
 		}
 	}
 	return output;
+}
+
+long run2(long *m1, long *m2) {
+	long ch = 0;
+	struct vm vm1 = (struct vm) { .m = m1, .pc = 0, .state = VM_START };
+	struct vm vm2 = (struct vm) { .m = m2, .pc = 0, .state = VM_START };
+	struct vm *r = &vm1, *s = &vm2;
+	for (;;) {
+		run(r);
+		switch (r->state) {
+		case VM_END:
+			if (s->state == VM_END)
+				return ch;
+			break;
+		case VM_SEND:
+			s->ch = r->ch;
+			break;
+		case VM_RECV:
+			break;
+		}
+		struct vm *tmp = r;
+		r = s, s = tmp;
+	}
 }
 
 int main(void) {
