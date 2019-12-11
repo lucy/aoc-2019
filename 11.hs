@@ -27,51 +27,40 @@ vm m ch rb pc = case is `mod` 100 of
     2 -> r (pc + i) + rb
   (p1, p2, p3) = (ix 1 100, ix 2 1000, ix 3 10000)
 
+turn :: N -> (N, N) -> (N, N)
+turn 0 (x, y) = (y, -x)
+turn 1 (x, y) = (-y, x)
+
 move :: (N, N) -> (N, N) -> (N, N)
 move (x, y) (u, v) = (x + u, y + v)
 
-turn :: N -> (N, N) -> (N, N)
-turn 1 (x, y) = (y, -x)
-turn 0 (x, y) = (-y, x)
+type Canvas = M.Map (N, N) N
 
-type Canvas = M.Map (N, N) Bool
-
-draw :: [N] -> [(N, Canvas)]
-draw l = go l (0, 0) (0, -1) M.empty
+draw :: [N] -> (N, N) -> (N, N) -> Canvas -> [(N, Canvas)]
+draw []           _ _ _ = []
+draw (c : t : xs) p d m = (v, m') : draw xs p' d' m'
  where
-  go :: [N] -> (N, N) -> (N, N) -> Canvas -> [(N, Canvas)]
-  go []           _ _ _ = []
-  go (c : t : xs) p d m = (v, m') : go xs p' d' m'
-   where
-    v  = if M.findWithDefault False p' m then 1 else 0
-    m' = case c of
-      1 -> M.insert p True m
-      0 -> M.insert p False m
-    d' = turn t d
-    p' = move d' p
+  v  = M.findWithDefault 0 p' m
+  m' = M.insert p c m
+  d' = turn t d
+  p' = move d' p
 
 run :: N -> Mem -> Canvas
 run c m = snd (last i)
  where
   o = vm m (c : map fst i) 0 0
-  i = draw o
+  i = draw o (0, 0) (0, -1) M.empty
 
 render :: Canvas -> String
 render m = unlines (map line [y .. h])
  where
-  line y = reverse $ map (\x -> px x y) [x .. w]
-  px x y = if M.findWithDefault False (x, y) m then '#' else ' '
+  line y = map (\x -> px x y) [x .. w]
+  px x y = if M.findWithDefault 0 (x, y) m == 0 then ' ' else '#'
   (Min x, Max w, Min y, Max h) = foldl1 (<>) (map f (M.keys m))
   f (x, y) = (Min x, Max x, Min y, Max y)
 
-splitOn :: (a -> Bool) -> [a] -> [[a]]
-splitOn f [] = []
-splitOn f s
-  | (x, _ : xs) <- break f s = x : splitOn f xs
-  | otherwise                = s : []
-
 main :: IO ()
 main = do
-  m <- M.fromList . zip [0 ..] . map read . splitOn (== ',') <$> getContents
+  m <- M.fromList . zip [0 ..] . read . ('[' :) . (++ "]") <$> getContents
   print (M.size (run 0 m))
   putStr (render (run 1 m))
