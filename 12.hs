@@ -9,24 +9,19 @@ parse s = fst (last (readP_to_S (many p) s))
   p = skipSpaces *> char '<' *> mapM v ['x', 'y', 'z'] <* char '>'
 
 sim :: [(Int, Int)] -> [(Int, Int)]
-sim l = map (move . foldl1 velocity) rotations
-  where rotations = take (length l) (iterate (\l -> tail l ++ [head l]) l)
-
-velocity :: (Int, Int) -> (Int, Int) -> (Int, Int)
-velocity (a, v) (b, _)
-  | a < b     = (a, v + 1)
-  | a > b     = (a, v - 1)
-  | otherwise = (a, v)
-
-move :: (Int, Int) -> (Int, Int)
-move (c, v) = (c + v, v)
+sim l =
+  [ (a + v', v')
+  | (a, v) <- l
+  , let v' = v + sum [ signum (b - a) | (b, _) <- l ]
+  ]
 
 energy :: [(Int, Int)] -> Int
 energy l = sum (map abs c) * sum (map abs v) where (c, v) = unzip l
 
 findCycle :: (Ord a) => S.Set a -> [a] -> Int
-findCycle s (x : xs) | S.member x s = S.size s
-                     | otherwise    = findCycle (S.insert x s) xs
+findCycle s (x : xs)
+  | S.member x s = S.size s
+  | otherwise    = findCycle (S.insert x s) xs
 
 main :: IO ()
 main = do
