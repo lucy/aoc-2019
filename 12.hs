@@ -24,14 +24,12 @@ move (c, v) = (c + v, v)
 energy :: [(Int, Int)] -> Int
 energy l = sum (map abs c) * sum (map abs v) where (c, v) = unzip l
 
-findCycles :: [[[(Int, Int)]]] -> [Int]
-findCycles (  []      : _) = []
-findCycles l@((_ : _) : _) = f (map head l) S.empty : findCycles (map tail l)
-  where f (x : xs) s = if S.member x s then S.size s else f xs (S.insert x s)
+findCycle :: (Ord a) => S.Set a -> [a] -> Int
+findCycle s (x : xs) | S.member x s = S.size s
+                     | otherwise    = findCycle (S.insert x s) xs
 
 main :: IO ()
 main = do
-  coords <- map (map (\x -> (x, 0))) . transpose . parse <$> getContents
-  let steps = iterate (map sim) coords
-  print $ sum (map energy (transpose (steps !! 1000)))
-  print $ foldl1 lcm (findCycles steps)
+  u <- map (map (\x -> (x, 0))) . transpose . parse <$> getContents
+  print $ sum (map energy (transpose (iterate (map sim) u !! 1000)))
+  print $ foldl1 lcm (map (findCycle S.empty) (map (iterate sim) u))

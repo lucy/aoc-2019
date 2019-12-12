@@ -5,7 +5,7 @@ hsbin = $(patsubst %.hs,%hs,$(wildcard *.hs))
 gobin = $(patsubst %.go,%go,$(wildcard *.go))
 all: $(cbin) $(hsbin) $(gobin)
 %c: %.c; $(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) $^ -o $@
-%hs: %.hs; ghc -v0 -O $^ -o $@
+%hs: %.hs; ghc -outputdir tmp/$@ -O $^ -o $@
 %go: %.go; go build -o $@ $^
-clean:; rm -f $(cbin) $(hsbin) $(gobin) *.o *.hi
+clean:; rm -rf -- tmp $(cbin) $(hsbin) $(gobin) *.o *.hi
 .PHONY: clean
