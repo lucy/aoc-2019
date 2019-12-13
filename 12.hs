@@ -1,5 +1,4 @@
 import Data.List
-import Data.Maybe
 import Text.ParserCombinators.ReadP
 
 parse :: String -> [[Int]]
@@ -19,5 +18,5 @@ main :: IO ()
 main = do
   u <- map (map (\x -> (x, 0))) . transpose . parse <$> getContents
   print $ sum (map energy (transpose (iterate (map sim) u !! 1000)))
-  print $ foldl1 lcm $ map succ $ catMaybes $
+  print $ foldl1 lcm $ map (succ . (\(Just x) -> x)) $
     zipWith elemIndex u (tail . iterate sim <$> u)
