@@ -19,7 +19,6 @@ type reaction struct {
 }
 
 func pc(s string) (c comp) { fmt.Sscanf(s, "%d %s", &c.c, &c.n); return }
-func divUp(x, d int) int   { return (x + d - 1) / d }
 
 func run(m map[string]reaction, n int) int {
 	ore := 0
@@ -35,18 +34,11 @@ func run(m map[string]reaction, n int) int {
 		r := m[x.n]
 		need := x.c
 		makes := r.r.c
-		left, _ := lefts[x.n]
-		if need <= left {
-			left -= need
-			lefts[x.n] = left
-		} else {
-			need -= left
-			toMake := (need + makes - 1) / makes
-			left = (need+makes-1)/makes*makes - need
-			lefts[x.n] = left
-			for _, in := range r.i {
-				q = append(q, comp{in.n, in.c * toMake})
-			}
+		need -= lefts[x.n]
+		toMake := (need + makes - 1) / makes
+		lefts[x.n] = (need+makes-1)/makes*makes - need
+		for _, in := range r.i {
+			q = append(q, comp{in.n, in.c * toMake})
 		}
 	}
 	return ore
