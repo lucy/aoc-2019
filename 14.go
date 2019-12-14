@@ -61,6 +61,19 @@ func main() {
 		m[r.r.n] = r
 	}
 	fmt.Println(run(m, 1))
-	/* manual binary search */
-	fmt.Println(run(m, 3445249) - 1000000000000)
+	n0, n1 := 0, 1
+	find := 1000000000000
+	for run(m, n1)-find < 0 {
+		n0, n1 = n1, n1*2
+	}
+	for n0 != n1 {
+		n := (n0 + n1) / 2
+		a := run(m, n)
+		if a-find < 0 {
+			n0 = n + 1
+		} else {
+			n1 = n
+		}
+	}
+	fmt.Println(n0 - 1)
 }
