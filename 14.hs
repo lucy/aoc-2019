@@ -33,15 +33,15 @@ run :: Map String (Int, [Component]) -> Int -> Int
 run m n = run' m 0 [(n, "FUEL")] M.empty
 
 search :: Int -> (Int -> Int) -> Int
-search t f = let (n0, n1) = s1 0 1 in s2 n0 n1 - 1
+search t f = s1 0 1
  where
   s1 n0 n1
-    | f n1 - t < 0 = s1 n1 (n1 * 2)
-    | otherwise    = (n0, n1)
+    | f n1 < t  = s1 n1 (n1 * 2)
+    | otherwise = s2 n0 n1
   s2 n0 n1
-    | n0 == n1    = n0
-    | f n - t < 0 = s2 (n + 1) n1
-    | otherwise   = s2 n0 n
+    | n0 == n1  = n0 - 1
+    | f n < t   = s2 (n + 1) n1
+    | otherwise = s2 n0 n
     where n = (n0 + n1) `quot` 2
 
 main = do
