@@ -21,8 +21,8 @@ vm m rb pc = case is `mod` 100 of
   9  -> vm m (rb + r p1) (pc + 2)
   99 -> Done
  where
-  r i = IM.findWithDefault 0 i m
-  w i x = IM.insert i x m
+  r i = IM.findWithDefault 0 (fromIntegral i) m
+  w i x = IM.insert (fromIntegral i) x m
   is = r pc
   ix i p = case is `quot` p `mod` 10 of
     1 -> pc + i
@@ -30,58 +30,51 @@ vm m rb pc = case is `mod` 100 of
     2 -> r (pc + i) + rb
   (p1, p2, p3) = (ix 1 100, ix 2 1000, ix 3 10000)
 
-data Tile = Empty | Wall | Oxygen | Unexplored deriving Eq
+data Tile = Empty | Oxygen | Unexplored | Wall deriving Eq
 
 type Canvas = M.Map (N, N) Tile
 
-render :: S.Set (N, N) -> Canvas -> String
-render s m = unlines [ [ px x y | x <- [x .. w] ] | y <- [y .. h] ]
+render :: (N, N) -> S.Set (N, N) -> Canvas -> String
+render b s m = unlines [ [ px (x, y) | x <- [x .. w] ] | y <- [y .. h] ]
  where
-  px x y = case M.findWithDefault Unexplored (x, y) m of
-    _ | (x, y) == (0, 0)  -> 'D'
-    Oxygen                -> '@'
-    _ | S.member (x, y) s -> '*'
-    Unexplored            -> ' '
-    Empty                 -> '.'
-    Wall                  -> '#'
+  px p = case M.findWithDefault Unexplored p m of
+    _ | p == b       -> 'D'
+    _ | S.member p s -> '*'
+    Empty            -> '.'
+    Oxygen           -> '@'
+    Unexplored       -> ' '
+    Wall             -> '#'
   (Min x, Max w, Min y, Max h) =
     mconcat [ (Min x, Max x, Min y, Max y) | (x, y) <- M.keys m ]
 
-move :: N -> (N, N) -> (N, N)
-move 1 (x, y) = (x, y - 1)
-move 2 (x, y) = (x, y + 1)
-move 3 (x, y) = (x - 1, y)
-move 4 (x, y) = (x + 1, y)
+move :: (N, N) -> N -> (N, N)
+move (x, y) 1 = (x, y - 1)
+move (x, y) 2 = (x, y + 1)
+move (x, y) 3 = (x - 1, y)
+move (x, y) 4 = (x + 1, y)
 
-run' :: [([(N, N)], Req)] -> [[(N, N)]] -> Canvas -> ([[(N, N)]], Canvas)
-run' [] paths c = (paths, c)
-run' ((path@(pos : _), st :< Get k) : q) paths c =
-  let queue dir = (move dir pos : path, k dir)
-  in
-    case M.lookup pos c of
-      Just Empty -> run' q paths c
-      _          -> case st of
-        0 -> run' q paths (M.insert pos Wall c)
-        1 -> run' (map queue [1 .. 4] ++ q) paths (M.insert pos Empty c)
-        2 -> run' q (path : paths) (M.insert pos Oxygen c)
+run :: [([(N, N)], Req)] -> Canvas -> [(N, N)] -> (Canvas, [(N, N)])
+run [] m p = (m, p)
+run ((p'@(pos : _), st :< Get k) : q) m p = case st of
+  _ | Just Empty <- m M.!? pos -> run q m p
+  0 -> run q (M.insert pos Wall m) p
+  1 -> run (map queue [1 .. 4] ++ q) (M.insert pos Empty m) p
+    where queue dir = (move pos dir : p', k dir)
+  2 -> run q (M.insert pos Oxygen m) (tail p')
 
 fill :: Canvas -> Int -> Int
-fill c n
-  | full      = n
-  | otherwise = fill (M.mapWithKey fill' c) (succ n)
+fill m n | not $ any (== Empty) (M.elems m) = n
+fill m n = fill (M.mapWithKey fill' m) (succ n)
  where
   adj :: (N, N) -> Bool
-  adj pos = any
-    (\k -> M.findWithDefault Unexplored k c == Oxygen)
-    (map (flip move pos) [1 .. 4])
+  adj pos = any (== Just Oxygen) (map ((m M.!?) . move pos) [1 .. 4])
   fill' :: (N, N) -> Tile -> Tile
   fill' pos t = if t == Empty && adj pos then Oxygen else t
-  full = not $ any (== Empty) (M.elems c)
 
 main :: IO ()
 main = do
   m <- IM.fromList . zip [0 ..] . read . ('[' :) . (++ "]") <$> getContents
-  let (paths, maze) = run' [([(0, 0)], 1 :< vm m 0 0)] [] M.empty
-  putStr $ render (S.fromList (paths !! 0)) maze
-  print $ length (paths !! 0) - 1
+  let (maze, path) = run [([(0, 0)], 1 :< vm m 0 0)] M.empty []
+  putStr $ render (0, 0) (S.fromList path) maze
+  print $ length path
   print $ fill maze 0
