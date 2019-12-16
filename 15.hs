@@ -1,6 +1,5 @@
 import Data.Semigroup
 import qualified Data.IntMap.Strict as IM
-import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 type N = Int
@@ -30,22 +29,14 @@ vm m rb pc = case is `mod` 100 of
     2 -> r (pc + i) + rb
   (p1, p2, p3) = (ix 1 100, ix 2 1000, ix 3 10000)
 
-data Tile = Empty | Oxygen | Unexplored | Wall deriving Eq
+type Map = S.Set (N, N)
 
-type Canvas = M.Map (N, N) Tile
-
-render :: (N, N) -> S.Set (N, N) -> Canvas -> String
-render b s m = unlines [ [ px (x, y) | x <- [x .. w] ] | y <- [y .. h] ]
+render :: Map -> String
+render m = unlines [ [ px (x, y) | x <- [x .. w] ] | y <- [y .. h] ]
  where
-  px p = case M.findWithDefault Unexplored p m of
-    _ | p == b       -> 'D'
-    _ | S.member p s -> '*'
-    Empty            -> '.'
-    Oxygen           -> '@'
-    Unexplored       -> ' '
-    Wall             -> '#'
+  px p = if S.member p m then '.' else ' '
   (Min x, Max w, Min y, Max h) =
-    mconcat [ (Min x, Max x, Min y, Max y) | (x, y) <- M.keys m ]
+    mconcat [ (Min x, Max x, Min y, Max y) | (x, y) <- S.toList m ]
 
 move :: (N, N) -> N -> (N, N)
 move (x, y) 1 = (x, y - 1)
@@ -53,28 +44,27 @@ move (x, y) 2 = (x, y + 1)
 move (x, y) 3 = (x - 1, y)
 move (x, y) 4 = (x + 1, y)
 
-run :: [([(N, N)], Req)] -> Canvas -> [(N, N)] -> (Canvas, [(N, N)])
-run [] m p = (m, p)
-run ((p'@(pos : _), st :< Get k) : q) m p = case st of
-  _ | Just Empty <- m M.!? pos -> run q m p
-  0 -> run q (M.insert pos Wall m) p
-  1 -> run (map queue [1 .. 4] ++ q) (M.insert pos Empty m) p
-    where queue dir = (move pos dir : p', k dir)
-  2 -> run q (M.insert pos Oxygen m) (tail p')
+run :: [((N, N), N, Req)] -> Map -> (N, N) -> N -> (Map, (N, N), N)
+run [] m o n = (m, o, n)
+run ((pos, n', st :< Get k) : q) m o n
+  | S.member pos m = run q m o n
+  | otherwise = case st of
+    0 -> run q m o n
+    1 -> run (map queue [1 .. 4] ++ q) (S.insert pos m) o n
+      where queue dir = (move pos dir, succ n', k dir)
+    2 -> run q m pos n'
 
-fill :: Canvas -> Int -> Int
-fill m n | not $ any (== Empty) (M.elems m) = n
-fill m n = fill (M.mapWithKey fill' m) (succ n)
+fill :: Map -> Map -> Int -> Int
+fill m o n = if S.null diff then n else fill m o' (succ n)
  where
-  adj :: (N, N) -> Bool
-  adj pos = any (== Just Oxygen) (map ((m M.!?) . move pos) [1 .. 4])
-  fill' :: (N, N) -> Tile -> Tile
-  fill' pos t = if t == Empty && adj pos then Oxygen else t
+  diff = S.difference m o
+  adj p = any (flip S.member o . move p) [1 .. 4]
+  o' = S.union o $ S.filter adj diff
 
 main :: IO ()
 main = do
   m <- IM.fromList . zip [0 ..] . read . ('[' :) . (++ "]") <$> getContents
-  let (maze, path) = run [([(0, 0)], 1 :< vm m 0 0)] M.empty []
-  putStr $ render (0, 0) (S.fromList path) maze
-  print $ length path
-  print $ fill maze 0
+  let (maze, o, n) = run [((0, 0), 0, 1 :< vm m 0 0)] S.empty (0, 0) 0
+  putStr $ render maze
+  print $ n
+  print $ fill maze (S.singleton o) 0
