@@ -52,11 +52,10 @@ run ((pos, n', st :< Get k) : q) m o n = case st of
     where queue dir = (move pos dir, succ n', k dir)
   2 -> run q m pos n'
 
-fill :: Map -> Map -> Int -> Int
-fill m o n
-  | S.null m  = n
-  | otherwise = fill (S.difference m a) (S.union o a) (succ n)
-  where a = S.filter (\p -> any (flip S.member o . move p) [1 .. 4]) m
+fill :: Map -> [(N, N)] -> Int -> Int
+fill m o n | S.null m = n
+fill m o n            = fill (S.difference m (S.fromList o')) o' (succ n)
+  where o' = [ p | e <- o, p <- move e <$> [1 .. 4], S.member p m ]
 
 main :: IO ()
 main = do
@@ -64,4 +63,4 @@ main = do
   let (maze, o, n) = run [((0, 0), 0, 1 :< vm m 0 0)] S.empty (0, 0) 0
   putStr $ render maze
   print $ n
-  print $ fill maze (S.singleton o) 0
+  print $ fill maze [o] 0
