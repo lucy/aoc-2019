@@ -45,21 +45,18 @@ move (x, y) 3 = (x - 1, y)
 move (x, y) 4 = (x + 1, y)
 
 run :: [((N, N), N, Req)] -> Map -> (N, N) -> N -> (Map, (N, N), N)
-run [] m o n = (m, o, n)
-run ((pos, n', st :< Get k) : q) m o n
-  | S.member pos m = run q m o n
-  | otherwise = case st of
-    0 -> run q m o n
-    1 -> run (map queue [1 .. 4] ++ q) (S.insert pos m) o n
-      where queue dir = (move pos dir, succ n', k dir)
-    2 -> run q m pos n'
+run []                           m o n = (m, o, n)
+run ((pos, n', st :< Get k) : q) m o n = case st of
+  p | p == 0 || S.member pos m -> run q m o n
+  1 -> run (map queue [1 .. 4] ++ q) (S.insert pos m) o n
+    where queue dir = (move pos dir, succ n', k dir)
+  2 -> run q m pos n'
 
 fill :: Map -> Map -> Int -> Int
-fill m o n = if S.null diff then n else fill m o' (succ n)
- where
-  diff = S.difference m o
-  adj p = any (flip S.member o . move p) [1 .. 4]
-  o' = S.union o $ S.filter adj diff
+fill m o n
+  | S.null m  = n
+  | otherwise = fill (S.difference m a) (S.union o a) (succ n)
+  where a = S.filter (\p -> any (flip S.member o . move p) [1 .. 4]) m
 
 main :: IO ()
 main = do
