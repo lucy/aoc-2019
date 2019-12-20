@@ -39,42 +39,29 @@ p1 :: Req -> Int
 p1 r = length [ (x, y) | x <- [0 .. 49], y <- [0 .. 49], test x y r ]
 
 p2 :: Req -> Int
-p2 r = z1 0 0 1
+p2 r = z 0 0 1
  where
   t x y = test x y r
-  f x y = t (x + 99) y && t x (y + 99)
-  z1 x y n
+  f x y = t x y && t (x + 99) y && t x (y + 99)
+  z x y n
     | f x y     = s x y
-    | t x'' y   = z1 x'' y n'
-    | t x' y    = z1 x' y n
-    | otherwise = (z2 x' y n)
+    | otherwise = z x' y' n'
    where
-    n'  = n * 2
-    x'  = x + n
-    x'' = x + n'
-  z2 x y n
-    | f x y     = s x y
-    | t x y''   = z2 x y'' n'
-    | t x y'    = z2 x y' n
-    | otherwise = (z1 x y' n)
-   where
-    n'  = n * 2
-    y'  = y + n
-    y'' = y + n'
+    (x', y', n') = head
+      [ (x + i, y + j, max i j)
+      | i <- [n * 2, n, 0]
+      , j <- [n * 2, n, 0]
+      , t (x + i) (y + j)
+      ]
   s x y
     | x' == x && y' == y = x * 10000 + y
     | otherwise          = s x' y'
    where
-    (x', y') = last
-      [ (x - i, y - j)
-      | i <- [0 .. 2]
-      , j <- [0 .. 2]
-      , t (x - i) (y - j) && f (x - i) (y - j)
-      ]
+    (x', y') = head
+      [ (x - i, y - j) | i <- [2, 1, 0], j <- [2, 1, 0], f (x - i) (y - j) ]
 
 main :: IO ()
 main = do
   m <- IM.fromList . zip [0 ..] . read . ('[' :) . (++ "]") <$> getContents
   print $ p1 (vm m 0 0)
   print $ p2 (vm m 0 0)
-
