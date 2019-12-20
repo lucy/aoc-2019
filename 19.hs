@@ -1,12 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
-import Data.Semigroup
-import Control.Monad
-import Data.Ord
-import Data.List
-import Debug.Trace
 import qualified Data.IntMap.Strict as IM
-import qualified Data.Set as S
-import qualified Data.Map.Strict as M
 
 type N = Int
 data Req = Get (N -> Req) | N :< Req | Done
@@ -35,7 +28,6 @@ vm m rb pc = case is `mod` 100 of
   (p1, p2, p3) = (ix 1 100, ix 2 1000, ix 3 10000)
 
 type Pos = (N, N)
-type Set = S.Set Pos
 
 put :: N -> Req -> Req
 put x (Get k) = k x
@@ -46,53 +38,39 @@ test x y (put x -> put y -> p :< r) = p == 1
 p1 :: Req -> Int
 p1 r = length [ (x, y) | x <- [0 .. 49], y <- [0 .. 49], test x y r ]
 
---p2 :: Req -> Int
-p2 r = let (x, y) = z1 0 0 1 in x * 10000 + y
+p2 :: Req -> Int
+p2 r = z1 0 0 1
  where
   t x y = test x y r
   f x y = t (x + 99) y && t x (y + 99)
   z1 x y n
-    | n >= 99 && f x y = s x y
-    | t x'' y          = z1 x'' y n'
-    | t x' y           = z1 x' y n
-    | otherwise        = (z2 x' y n)
+    | f x y     = s x y
+    | t x'' y   = z1 x'' y n'
+    | t x' y    = z1 x' y n
+    | otherwise = (z2 x' y n)
    where
     n'  = n * 2
     x'  = x + n
     x'' = x + n'
   z2 x y n
-    | n >= 99 && f x y = s x y
-    | t x y''          = z2 x y'' n'
-    | t x y'           = z2 x y' n
-    | otherwise        = (z1 x y' n)
+    | f x y     = s x y
+    | t x y''   = z2 x y'' n'
+    | t x y'    = z2 x y' n
+    | otherwise = (z1 x y' n)
    where
     n'  = n * 2
     y'  = y + n
     y'' = y + n'
   s x y
-    | t x' y' && f x' y'   = s x' y'
-    | t x' y && f x' y     = s x' y
-    | t x y' && f x y'     = s x y'
-    | t x'' y' && f x'' y' = s x'' y'
-    | t x'' y && f x'' y   = s x'' y
-    | t x' y'' && f x' y'' = s x' y''
-    | t x y'' && f x y''   = s x y''
-    | otherwise            = (x, y)
+    | x' == x && y' == y = x * 10000 + y
+    | otherwise          = s x' y'
    where
-    x'  = pred x
-    y'  = pred y
-    x'' = pred x'
-    y'' = pred y'
-
-render :: Set -> String
-render m = unlines [ [ px (x, y) | x <- [x .. w] ] | y <- [y .. h] ]
- where
-  px :: Pos -> Char
-  px c
-    | S.member c m = '#'
-    | otherwise    = '.'
-  (Min x, Max w, Min y, Max h) =
-    mconcat [ (Min x, Max x, Min y, Max y) | (x, y) <- S.toList m ]
+    (x', y') = last
+      [ (x - i, y - j)
+      | i <- [0 .. 2]
+      , j <- [0 .. 2]
+      , t (x - i) (y - j) && f (x - i) (y - j)
+      ]
 
 main :: IO ()
 main = do
