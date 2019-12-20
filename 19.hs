@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 import qualified Data.IntMap.Strict as IM
 
 type N = Int
@@ -27,41 +26,20 @@ vm m rb pc = case is `mod` 100 of
     2 -> r (pc + i) + rb
   (p1, p2, p3) = (ix 1 100, ix 2 1000, ix 3 10000)
 
-type Pos = (N, N)
-
-put :: N -> Req -> Req
-put x (Get k) = k x
-
 test :: N -> N -> Req -> Bool
-test x y (put x -> put y -> p :< r) = p == 1
+test x y (Get k) | (Get k') <- k x, p :< r <- k' y = p == 1
 
-p1 :: Req -> Int
+p1 :: Req -> N
 p1 r = length [ (x, y) | x <- [0 .. 49], y <- [0 .. 49], test x y r ]
 
-p2 :: Req -> Int
-p2 r = z 0 0 1
- where
-  t x y = test x y r
-  f x y = t x y && t (x + 99) y && t x (y + 99)
-  z x y n
-    | f x y     = s x y
-    | otherwise = z x' y' n'
-   where
-    (x', y', n') = head
-      [ (x + i, y + j, max i j)
-      | i <- [n * 2, n, 0]
-      , j <- [n * 2, n, 0]
-      , t (x + i) (y + j)
-      ]
-  s x y
-    | x' == x && y' == y = x * 10000 + y
-    | otherwise          = s x' y'
-   where
-    (x', y') = head
-      [ (x - i, y - j) | i <- [2, 1, 0], j <- [2, 1, 0], f (x - i) (y - j) ]
+p2 :: Req -> N -> N -> N
+p2 r x y
+  | test (x + 99) (y - 99) r = x * 10000 + (y - 99)
+  | test x (succ y) r        = p2 r x (succ y)
+  | otherwise                = p2 r (succ x) y
 
 main :: IO ()
 main = do
   m <- IM.fromList . zip [0 ..] . read . ('[' :) . (++ "]") <$> getContents
   print $ p1 (vm m 0 0)
-  print $ p2 (vm m 0 0)
+  print $ p2 (vm m 0 0) 0 100
