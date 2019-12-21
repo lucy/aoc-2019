@@ -11,16 +11,16 @@ type Pos = (Int, Int)
 
 data Dir = N | S | W | E deriving (Enum, Show)
 
-allDirs :: [Dir]
-allDirs = enumFrom $ toEnum 0
-
 move :: Pos -> Dir -> Pos
 move (x, y) N = (x, y - 1)
 move (x, y) S = (x, y + 1)
 move (x, y) W = (x - 1, y)
 move (x, y) E = (x + 1, y)
 
-data Tile = Portal String Pos | Open | Wall deriving Show
+adj :: Pos -> [Pos]
+adj p = move p <$> [N, S, W, E]
+
+data Tile = Portal String Pos | Open deriving Show
 
 parse :: String -> Map Pos Tile
 parse s = tm
@@ -39,36 +39,30 @@ parse s = tm
     name = map snd $ sort [(p, c), (p', c')]
     [(p', c')] =
       [ (p', c')
-      | (p', Just c') <- (\p' -> (p', M.lookup p' cm)) . move p <$> allDirs
+      | (p', Just c') <- (\p' -> (p', M.lookup p' cm)) <$> adj p
       , isLetter c'
       ]
-    [pos] =
-      [ pos
-      | l   <- [p, p']
-      , pos <- move l <$> allDirs
-      , M.lookup pos cm == Just '.'
-      ]
+    [pos] = [ pos | l <- [p, p'], pos <- adj l, M.lookup pos cm == Just '.' ]
 
 portal :: Map Pos Tile -> String -> [Pos]
 portal m s = nub [ pos | (p, Portal name pos) <- M.toList m, name == s ]
 
 p1 :: Map Pos Tile -> Int
-p1 m = minimum $ map fst $ go [(-1, [fp])]
+p1 m = minimum $ go [(fp, -1, S.empty)]
  where
   ([fp], [tp]) = (portal m "AA", portal m "ZZ")
-  go :: [(Int, [Pos])] -> [(Int, [Pos])]
-  go []                     = []
-  go ((n, p@(c : cs)) : ps) = case M.findWithDefault Wall c m of
-    _ | elem c cs -> go ps
-    Open          -> go (next ++ ps)
-      where next = [ (n + 1, c' : p) | c' <- move c <$> allDirs ]
-    Portal "AA" pos -> go ps
-    Portal "ZZ" pos -> (n, cs) : go ps
-    Portal name pos -> go ((n, dest : p) : ps)
-      where [dest] = [ p | p <- portal m name, p /= pos ]
-    Wall -> go ps
-
-type Pos3 = (Int, Pos)
+  go :: [(Pos, Int, S.Set Pos)] -> [Int]
+  go [] = []
+  go ((p, n, v) : s)
+    | S.member p v = go s
+    | Just t <- M.lookup p m = case t of
+      Open -> go (next ++ s)
+        where next = [ (p', n + 1, S.insert p v) | p' <- adj p ]
+      Portal "AA" _   -> go s
+      Portal "ZZ" _   -> n : go s
+      Portal name pos -> go ((dest, n, S.insert p v) : s)
+        where [dest] = [ p | p <- portal m name, p /= pos ]
+    | otherwise = go s
 
 p2 :: Map Pos Tile -> Int
 p2 m = go (S.singleton ((0, fp), -1, S.empty))
@@ -78,26 +72,20 @@ p2 m = go (S.singleton ((0, fp), -1, S.empty))
     mconcat [ (Min x, Max x, Min y, Max y) | ((x, y), Open) <- M.toList m ]
   outer :: Pos -> Bool
   outer (x, y) = x == bx || x == bw || y == by || y == bh
-  go :: Set (Pos3, Int, Set Pos3) -> Int
-  go (S.deleteFindMin -> ((p@(level, pos), n, v), s))
-    | S.member p v = go s
-    | level < 0 = go s
-    | otherwise = case M.findWithDefault Wall pos m of
-      Open -> go (S.union next s)
+  go :: Set ((Int, Pos), Int, Set (Int, Pos)) -> Int
+  go (S.deleteFindMin -> ((q@(l, p), n, v), s))
+    | l < 0 = go s
+    | S.member q v = go s
+    | Just t <- M.lookup p m = case t of
+      Open -> go (S.union (S.fromList next) s)
+        where next = [ ((l, p'), n + 1, S.insert q v) | p' <- adj p ]
+      Portal "AA" p -> go s
+      Portal "ZZ" p -> if l == 0 then n else go s
+      Portal name p -> go (S.insert ((l', p'), n, S.insert q v) s)
        where
-        next = S.fromList
-          [ ((level, pos'), n + 1, S.insert p v)
-          | pos' <- move pos <$> allDirs
-          ]
-      Portal name pos -> case name of
-        "AA"              -> go s
-        "ZZ" | level == 0 -> n
-        "ZZ"              -> go s
-        name              -> go (S.insert ((level', dest), n, S.insert p v) s)
-         where
-          level' = if outer pos then level - 1 else level + 1
-          [dest] = [ p | p <- portal m name, p /= pos ]
-      Wall -> go s
+        l'   = if outer p then l - 1 else l + 1
+        [p'] = [ p' | p' <- portal m name, p' /= p ]
+    | otherwise = go s
 
 main = do
   m <- parse <$> getContents
