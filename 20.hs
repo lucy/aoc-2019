@@ -54,8 +54,7 @@ p1 m = minimum $ go [(fp, -1, S.empty)]
   go :: [(Pos, Int, S.Set Pos)] -> [Int]
   go [] = []
   go ((p, n, v) : s)
-    | S.member p v = go s
-    | Just t <- M.lookup p m = case t of
+    | not (S.member p v), Just t <- M.lookup p m = case t of
       Open -> go (next ++ s)
         where next = [ (p', n + 1, S.insert p v) | p' <- adj p ]
       Portal "AA" _   -> go s
@@ -65,23 +64,23 @@ p1 m = minimum $ go [(fp, -1, S.empty)]
     | otherwise = go s
 
 p2 :: Map Pos Tile -> Int
-p2 m = go (S.singleton ((0, fp), -1, S.empty))
+p2 m = go (M.singleton (0, fp) (-1, S.empty))
  where
   ([fp], [tp]) = (portal m "AA", portal m "ZZ")
   (Min bx, Max bw, Min by, Max bh) =
     mconcat [ (Min x, Max x, Min y, Max y) | ((x, y), Open) <- M.toList m ]
   outer :: Pos -> Bool
   outer (x, y) = x == bx || x == bw || y == by || y == bh
-  go :: Set ((Int, Pos), Int, Set (Int, Pos)) -> Int
-  go (S.deleteFindMin -> ((q@(l, p), n, v), s))
-    | l < 0 = go s
-    | S.member q v = go s
-    | Just t <- M.lookup p m = case t of
-      Open -> go (S.union (S.fromList next) s)
-        where next = [ ((l, p'), n + 1, S.insert q v) | p' <- adj p ]
+  min' :: (Int, Set a) -> (Int, Set a) -> (Int, Set a)
+  min' a@(x, sx) b@(y, sy) = if x < y || S.size sx < S.size sy then a else b
+  go :: Map (Int, Pos) (Int, Set (Int, Pos)) -> Int
+  go (M.deleteFindMin -> ((q@(l, p), (n, v)), s))
+    | l >= 0, not (S.member q v), Just t <- M.lookup p m = case t of
+      Open -> go (M.unionWith min' (M.fromList next) s)
+        where next = [ ((l, p'), (n + 1, S.insert q v)) | p' <- adj p ]
       Portal "AA" p -> go s
       Portal "ZZ" p -> if l == 0 then n else go s
-      Portal name p -> go (S.insert ((l', p'), n, S.insert q v) s)
+      Portal name p -> go (M.insertWith min' (l', p') (n, S.insert q v) s)
        where
         l'   = if outer p then l - 1 else l + 1
         [p'] = [ p' | p' <- portal m name, p' /= p ]
